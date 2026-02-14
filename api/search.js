@@ -1,60 +1,41 @@
-const axios = require("axios");
-const cheerio = require("cheerio");
+const SEARCH = "https://goyabu.io/wp-json/animeonline/search/";
+const NONCE = "5ecb5079b5";
 
 module.exports = async (req, res) => {
   try {
-    const { id } = req.query;
+    const keyword = String(req.query.keyword || "").trim();
 
-    if (!id || !/^\d+$/.test(id)) {
+    if (!keyword) {
       return res.status(400).json({
         success: false,
-        error: "ID inválido. Use apenas número.",
-        example: "/api/sinopse/69698"
+        error: "keyword vazio"
       });
     }
 
-    const pageUrl = `https://goyabu.io/${id}`;
+    const url = new URL(SEARCH);
+    url.searchParams.set("keyword", keyword);
+    url.searchParams.set("nonce", NONCE);
 
-    const { data } = await axios.get(pageUrl, {
+    const response = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "Mozilla/5.0",
-        Accept: "text/html,*/*"
+        Accept: "application/json"
       }
     });
 
-    const $ = cheerio.load(data);
+    const text = await response.text();
 
-    const full = $(".sinopse-full").text().trim();
-    const short = $(".sinopse-short").text().trim();
-    const sinopse = full || short || "Sinopse não encontrada";
+    res.statusCode = response.status;
+    res.setHeader(
+      "Content-Type",
+      response.headers.get("content-type") || "application/json"
+    );
 
-    const image =
-      $(".anime-thumb img").attr("src") ||
-      $("meta[property='og:image']").attr("content") ||
-      "";
-
-    const title =
-      $("h1").first().text().trim() ||
-      $("meta[property='og:title']").attr("content") ||
-      "";
-    
-    // Pegar link do player
-    const playerLink = $("#player iframe").attr("src") || "";
-
-    return res.status(200).json({
-      success: true,
-      id,
-      page_url: pageUrl,
-      title,
-      image,
-      sinopse,
-      player_link: playerLink // Novo campo com o link do player
-    });
+    return res.end(text);
 
   } catch (err) {
     return res.status(500).json({
       success: false,
-      error: err?.message || String(err)
+      error: String(err?.message || err)
     });
   }
 };
