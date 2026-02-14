@@ -1,11 +1,12 @@
 const AJAX = "https://goyabu.io/wp-admin/admin-ajax.php";
+const BASE = "https://goyabu.io";
 
 module.exports = async (req, res) => {
   try {
     const animeId = String(req.query.anime_id || "").trim();
-    if (!animeId) {
-      res.status(400).json({ error: "anime_id vazio" });
-      return;
+
+    if (!animeId || !/^\d+$/.test(animeId)) {
+      return res.status(400).json({ error: "anime_id inválido" });
     }
 
     const url = new URL(AJAX);
@@ -14,21 +15,36 @@ module.exports = async (req, res) => {
 
     const response = await fetch(url.toString(), {
       headers: {
+        "User-Agent": "Mozilla/5.0",
         Accept: "application/json, text/javascript, */*; q=0.01",
-        "X-Requested-With": "XMLHttpRequest"
+        "X-Requested-With": "XMLHttpRequest",
+        Referer: "https://goyabu.io/"
       }
     });
 
-    const text = await response.text();
+    const data = await response.json();
 
-    res.statusCode = response.status;
-    res.setHeader(
-      "Content-Type",
-      response.headers.get("content-type") || "application/json"
-    );
-    res.end(text);
+    if (data?.success && Array.isArray(data.data)) {
+      data.data = data.data.map(ep => {
+        return {
+          id: ep.id,
+          episodio: ep.episodio,
+          link: BASE + ep.link,
+          type: ep.type,
+          episode_name: ep.episode_name,
+          audio: ep.audio,
+          imagem: ep.imagem ? BASE + ep.imagem : "",
+          update: ep.update,
+          status: ep.status
+        };
+      });
+    }
+
+    return res.status(200).json(data);
 
   } catch (err) {
-    res.status(500).json({ error: String(err?.message || err) });
+    return res.status(500).json({
+      error: String(err?.message || err)
+    });
   }
 };
