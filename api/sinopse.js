@@ -3,48 +3,52 @@ const cheerio = require("cheerio");
 
 module.exports = async (req, res) => {
   try {
-    const episodeId = String(req.query.episode_id || "").trim();
-    const rawUrl = String(req.query.url || "").trim();
+    const id = String(req.query.id || "").trim();
 
-    if (!episodeId && !rawUrl) {
-      return res.status(200).json({
-        success: true,
-        how_to_use: {
-          by_episode_id: "/api/sinopse?episode_id=69698",
-          by_url: "/api/sinopse?url=https://goyabu.io/anime/douse-koishite-shimaunda-2"
-        }
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: "Passe o ID. Ex: /api/sinopse?id=69698"
       });
     }
 
-    const pageUrl = rawUrl
-      ? rawUrl
-      : `https://goyabu.io/${encodeURIComponent(episodeId)}`;
+    const pageUrl = `https://goyabu.io/${id}`;
 
     const { data } = await axios.get(pageUrl, {
-      headers: { "User-Agent": "Mozilla/5.0", Accept: "text/html,*/*" }
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        Accept: "text/html,*/*"
+      }
     });
 
     const $ = cheerio.load(data);
 
+    // 🔥 SINOPSE
     const full = $(".sinopse-full").text().trim();
     const short = $(".sinopse-short").text().trim();
-    const sinopse = full || short || "";
+    const sinopse = full || short || "Sinopse não encontrada";
 
-    const playerLink = $("#player iframe").attr("src") || $("iframe").attr("src") || "";
+    // 🔥 TITULO
+    const title =
+      $("h1").first().text().trim() ||
+      $("meta[property='og:title']").attr("content") ||
+      "";
 
+    // 🔥 IMAGEM
     const image =
       $(".anime-thumb img").attr("src") ||
-      $(".poster img").attr("src") ||
       $("meta[property='og:image']").attr("content") ||
       "";
 
     return res.status(200).json({
       success: true,
+      id,
       page_url: pageUrl,
-      sinopse,
+      title,
       image,
-      player_iframe: playerLink
+      sinopse
     });
+
   } catch (err) {
     return res.status(500).json({
       success: false,
