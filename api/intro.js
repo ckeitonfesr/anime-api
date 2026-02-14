@@ -71,7 +71,7 @@ module.exports = async (req, res) => {
 
     <div class="top">
       <h1>Anime API</h1>
-      <p class="sub">Docs simples. Credits: DVHACKZ.</p>
+      <p class="sub">Docs simples. Credits: DVHACKZZ.</p>
     </div>
 
     <div class="item">
@@ -99,7 +99,7 @@ module.exports = async (req, res) => {
       <pre>Ex: "Overlord 4 Dublado" -> ""Overlord-4-Dublado"</pre>
     </div>
 
-    <div class="foot">status: online</div>
+    <div class="foot">Discord: dvhackzz</div>
 
   </div>
 </body>
