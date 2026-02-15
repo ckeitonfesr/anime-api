@@ -5,27 +5,5 @@
       "destination": "/api/intro",
       "permanent": false
     }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/animefire/:path*",
-      "destination": "/api/animefirebylopes.js"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, X-Requested-With" }
-      ]
-    }
-  ],
-  "functions": {
-    "api/animefirebylopes.js": {
-      "maxDuration": 30,
-      "memory": 1024
-    }
-  }
+  ]
 }
