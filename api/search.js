@@ -1,25 +1,55 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
 
-// Função para buscar gêneros de um anime
-async function getGenerosDoAnime(slug) {
+const SEARCH = "https://goyabu.io/wp-json/animeonline/search/";
+const NONCE = "5ecb5079b5";
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+
+function normUrl(u) {
+  if (!u) return null;
+  if (u.startsWith("http")) return u;
+  return "https://goyabu.io" + (u.startsWith("/") ? u : "/" + u);
+}
+
+function slugFromUrl(u) {
   try {
-    const url = `https://goyabu.io/anime/${slug}`;
-    const { data } = await axios.get(url, {
-      headers: { "User-Agent": "Mozilla/5.0" },
-      timeout: 5000
+    const p = new URL(u).pathname.split("/").filter(Boolean);
+    return p[p.length - 1] || null;
+  } catch {
+    const p = String(u || "").split("/").filter(Boolean);
+    return p[p.length - 1] || null;
+  }
+}
+
+function scoreTitle(title, q) {
+  const t = String(title || "").toLowerCase();
+  const k = String(q || "").toLowerCase();
+  if (!t || !k) return 0;
+  if (t === k) return 100;
+  if (t.includes(k)) return 80;
+  const w = k.split(/\s+/).filter(Boolean);
+  let s = 0;
+  for (const token of w) if (t.includes(token)) s += 10;
+  return s;
+}
+
+async function getGenerosFromAnimeUrl(animeUrl) {
+  try {
+    const { data } = await axios.get(animeUrl, {
+      headers: { "User-Agent": UA, Accept: "text/html" },
+      timeout: 3500
     });
 
     const $ = cheerio.load(data);
     const generos = [];
 
-    $('.filter-btn[href*="generos"]').each((i, el) => {
-      const genero = $(el).text().trim();
-      if (genero) generos.push(genero);
+    $('.filter-btn[href*="generos"], a[href*="/generos/"]').each((_, el) => {
+      const g = $(el).text().trim();
+      if (g && !generos.includes(g)) generos.push(g);
     });
 
     return generos;
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -27,127 +57,53 @@ async function getGenerosDoAnime(slug) {
 module.exports = async (req, res) => {
   try {
     const keyword = String(req.query.keyword || "").trim();
+    const comGeneros = String(req.query.generos || req.query.com_generos || "1") === "1";
 
     if (!keyword) {
-      return res.status(400).json({
-        success: false,
-        error: "keyword vazio"
-      });
+      return res.status(400).json({ success: false, error: "keyword vazio" });
     }
 
-    // Slug base (formata o nome para URL)
-    const baseSlug = keyword.toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+    const url = new URL(SEARCH);
+    url.searchParams.set("keyword", keyword);
+    url.searchParams.set("nonce", NONCE);
 
-    // Lista de slugs possíveis
-    const slugsParaTestar = [
-      baseSlug,
-      `${baseSlug}-2`,
-      `${baseSlug}-3`,
-      `${baseSlug}-4`,
-      `${baseSlug}-5`,
-      `${baseSlug}-dublado`,
-      `${baseSlug}-legendado`,
-      `${baseSlug}-filme`,
-      `${baseSlug}-serie`,
-      `${baseSlug}-temporada-1`,
-      `${baseSlug}-temporada-2`,
-      `${baseSlug}-temporada-3`,
-      `${baseSlug}-temporada-4`,
-      `${baseSlug}-parte-1`,
-      `${baseSlug}-parte-2`,
-      `${baseSlug}-i`,
-      `${baseSlug}-ii`,
-      `${baseSlug}-iii`,
-      `${baseSlug}-iv`,
-      `${baseSlug}-v`,
-      `${baseSlug}-vi`
-    ];
+    const r = await axios.get(url.toString(), {
+      headers: { "User-Agent": UA, Accept: "application/json" },
+      timeout: 6000
+    });
 
-    const resultados = [];
-    const slugsTestados = new Set();
+    const obj = typeof r.data === "string" ? JSON.parse(r.data) : r.data;
+    const list = Object.entries(obj || {}).map(([id, v]) => ({
+      id: String(id),
+      titulo: v?.title || "",
+      url: normUrl(v?.url),
+      thumb: normUrl(v?.img),
+      audio: v?.audio ?? null,
+      year: v?.year ?? null
+    })).filter(x => x.url && x.titulo);
 
-    for (const slug of slugsParaTestar) {
-      if (slugsTestados.has(slug)) continue;
-      slugsTestados.add(slug);
+    if (!list.length) return res.status(200).json([]);
 
-      try {
-        const testUrl = `https://goyabu.io/anime/${slug}`;
-        const testResponse = await axios.get(testUrl, {
-          headers: { "User-Agent": "Mozilla/5.0" },
-          timeout: 3000,
-          validateStatus: () => true
-        });
+    list.sort((a, b) => scoreTitle(b.titulo, keyword) - scoreTitle(a.titulo, keyword));
+    const best = list[0];
 
-        if (testResponse.status === 200 && !testResponse.data.includes('404') && !testResponse.data.includes('não encontrada')) {
-          
-          const $ = cheerio.load(testResponse.data);
-          const generos = [];
-          
-          $('.filter-btn[href*="generos"]').each((i, el) => {
-            const genero = $(el).text().trim();
-            if (genero) generos.push(genero);
-          });
-          
-          const titulo = $('h1.text-hidden').first().text().trim() || slug;
-          const thumb = $('meta[property="og:image"]').attr('content') || null;
-          
-          // Tenta extrair ID
-          let id = null;
-          const scripts = $('script').map((i, el) => $(el).html()).get();
-          for (const script of scripts) {
-            if (script && script.includes('post_id')) {
-              const match = script.match(/post_id[=:]\s*(\d+)/);
-              if (match) {
-                id = match[1];
-                break;
-              }
-            }
-          }
-          
-          resultados.push({
-            id: id || slug.match(/\d+$/)?.[0] || null,
-            slug,
-            titulo,
-            thumb,
-            url: testUrl,
-            generos: generos.length ? generos : ["Não informado"]
-          });
-        }
-      } catch {
-        // Ignora erros
-      }
+    const slug = slugFromUrl(best.url);
+    let generos = [];
 
-      // Delay para não sobrecarregar
-      await new Promise(resolve => setTimeout(resolve, 200));
+    if (comGeneros) {
+      generos = await getGenerosFromAnimeUrl(best.url);
     }
 
-    // Remove duplicatas
-    const unicos = [];
-    const titulosVistos = new Set();
-    
-    for (const anime of resultados) {
-      const tituloLower = anime.titulo.toLowerCase();
-      if (!titulosVistos.has(tituloLower)) {
-        titulosVistos.add(tituloLower);
-        unicos.push(anime);
-      }
-    }
-
-    res.setHeader("Content-Type", "application/json");
-    
-    if (unicos.length === 0) {
-      return res.status(200).json([]);
-    }
-
-    return res.status(200).json(unicos);
+    return res.status(200).json([{
+      id: best.id || null,
+      slug,
+      titulo: best.titulo,
+      thumb: best.thumb || null,
+      url: best.url,
+      generos: generos.length ? generos : ["Não informado"]
+    }]);
 
   } catch (err) {
-    return res.status(500).json({
-      success: false,
-      error: String(err?.message || err)
-    });
+    return res.status(500).json({ success: false, error: String(err?.message || err) });
   }
 };
