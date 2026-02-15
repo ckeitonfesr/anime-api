@@ -38,7 +38,7 @@ async function getTotalPaginas() {
 
 module.exports = async (req, res) => {
   
-  const { pagina = 1, limite = 20 } = req.query;
+  const { pagina = 1, limite = 30 } = req.query;
   
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Content-Type', 'application/json');
@@ -56,7 +56,7 @@ module.exports = async (req, res) => {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
       },
-      timeout: 8000 // reduzido
+      timeout: 8000
     });
 
     const $ = cheerio.load(data);
