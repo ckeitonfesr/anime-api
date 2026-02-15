@@ -1,16 +1,22 @@
-const axios = require("axios");
-
 const AJAX = "https://goyabu.io/wp-admin/admin-ajax.php";
 const BASE = "https://goyabu.io";
 
-async function getEpisodios(animeId) {
-  console.log("=".repeat(60));
-  console.log(`🎬 BUSCANDO EPISÓDIOS DO ANIME ID: ${animeId}`);
-  console.log("=".repeat(60));
-  
+function absUrl(u) {
+  if (!u) return "";
+  u = String(u).trim();
+  if (!u) return "";
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  if (u.startsWith("//")) return "https:" + u;
+  if (u.startsWith("/")) return BASE + u;
+  return BASE + "/" + u;
+}
+
+module.exports = async (req, res) => {
   try {
-    if (!animeId || !/^\d+$/.test(String(animeId))) {
-      console.log("❌ anime_id inválido (use apenas números)");
+    const animeId = String(req.query.anime_id || "").trim();
+
+    if (!animeId || !/^\d+$/.test(animeId)) {
+      res.status(400).json({ success: false, error: "anime_id inválido" });
       return;
     }
 
@@ -18,88 +24,33 @@ async function getEpisodios(animeId) {
     url.searchParams.set("action", "get_anime_episodes");
     url.searchParams.set("anime_id", animeId);
 
-    console.log(`\n📡 Chamando API: ${url.toString()}\n`);
-
-    const response = await axios.get(url.toString(), {
+    const response = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "User-Agent": "Mozilla/5.0",
+        Accept: "application/json, text/javascript, */*; q=0.01",
         "X-Requested-With": "XMLHttpRequest",
-        "Referer": "https://goyabu.io/"
-      },
-      timeout: 10000
+        Referer: BASE + "/"
+      }
     });
 
-    const data = response.data;
+    const data = await response.json();
 
     if (data?.success && Array.isArray(data.data)) {
-      const episodios = data.data.map(ep => ({
-        id: ep.id,
-        episodio: ep.episodio,
-        link: BASE + ep.link,
-        type: ep.type,
-        episode_name: ep.episode_name || '',
-        audio: ep.audio === 'ptBr' ? 'dublado' : 'legendado',
-        imagem: ep.imagem ? BASE + ep.imagem : null,
-        update: ep.update,
-        status: ep.status || 'disponível'
+      data.data = data.data.map((ep) => ({
+        id: ep?.id ?? null,
+        episodio: String(ep?.episodio ?? ""),
+        link: absUrl(ep?.link),
+        type: String(ep?.type ?? ""),
+        episode_name: String(ep?.episode_name ?? ""),
+        audio: String(ep?.audio ?? ""),
+        imagem: absUrl(ep?.imagem),
+        update: String(ep?.update ?? ""),
+        status: String(ep?.status ?? "")
       }));
-
-      console.log(`✅ Encontrados ${episodios.length} episódios\n`);
-      
-      // Mostra os primeiros 5 como exemplo
-      episodios.slice(0, 5).forEach((ep, index) => {
-        console.log(`${index + 1}. Episódio ${ep.episodio}`);
-        console.log(`   ID: ${ep.id}`);
-        console.log(`   Áudio: ${ep.audio}`);
-        console.log(`   Link: ${ep.link}`);
-        console.log(`   Imagem: ${ep.imagem || 'Sem imagem'}`);
-        console.log('   ---');
-      });
-
-      if (episodios.length > 5) {
-        console.log(`... e mais ${episodios.length - 5} episódios`);
-      }
-
-      console.log("\n" + "=".repeat(60));
-      
-      // Retorna todos os episódios
-      return {
-        success: true,
-        anime_id: animeId,
-        total: episodios.length,
-        episodios
-      };
-      
-    } else {
-      console.log("❌ Nenhum episódio encontrado para este anime");
-      return { success: false, error: "Nenhum episódio encontrado" };
     }
 
-  } catch (error) {
-    console.error("\n❌ ERRO:", error.message);
-    if (error.response) {
-      console.error("Status:", error.response.status);
-      console.error("Data:", error.response.data);
-    }
-    return { success: false, error: error.message };
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(500).json({ success: false, error: String(err?.message || err) });
   }
-}
-
-// 🎯 EXECUTAR - Passe o ID do anime
-const args = process.argv.slice(2);
-let animeId = args.length > 0 ? args[0] : "40927"; // 40927 = Overlord 4 Dublado
-
-// Remove qualquer caractere não numérico
-animeId = animeId.replace(/\D/g, '');
-
-if (!animeId) {
-  console.log("\n❌ ID inválido! Use: node test.js 40927");
-  process.exit(1);
-}
-
-getEpisodios(animeId).then(result => {
-  if (result?.success) {
-    console.log(`\n✅ Total: ${result.total} episódios encontrados`);
-  }
-});
+};
