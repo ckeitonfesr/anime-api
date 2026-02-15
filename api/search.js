@@ -1,10 +1,7 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
 
-const SEARCH = "https://goyabu.io/wp-json/animeonline/search/";
-const NONCE = "5ecb5079b5";
-
-// Função para buscar gêneros de um anime pelo slug
+// Função para buscar gêneros de um anime
 async function getGenerosDoAnime(slug) {
   try {
     const url = `https://goyabu.io/anime/${slug}`;
@@ -38,57 +35,116 @@ module.exports = async (req, res) => {
       });
     }
 
-    console.log(`\n🔍 Buscando: "${keyword}"`);
+    // Slug base (formata o nome para URL)
+    const baseSlug = keyword.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
 
-    // 1️⃣ Faz a busca na API
-    const url = new URL(SEARCH);
-    url.searchParams.set("keyword", keyword);
-    url.searchParams.set("nonce", NONCE);
+    // Lista de slugs possíveis
+    const slugsParaTestar = [
+      baseSlug,
+      `${baseSlug}-2`,
+      `${baseSlug}-3`,
+      `${baseSlug}-4`,
+      `${baseSlug}-5`,
+      `${baseSlug}-dublado`,
+      `${baseSlug}-legendado`,
+      `${baseSlug}-filme`,
+      `${baseSlug}-serie`,
+      `${baseSlug}-temporada-1`,
+      `${baseSlug}-temporada-2`,
+      `${baseSlug}-temporada-3`,
+      `${baseSlug}-temporada-4`,
+      `${baseSlug}-parte-1`,
+      `${baseSlug}-parte-2`,
+      `${baseSlug}-i`,
+      `${baseSlug}-ii`,
+      `${baseSlug}-iii`,
+      `${baseSlug}-iv`,
+      `${baseSlug}-v`,
+      `${baseSlug}-vi`
+    ];
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        Accept: "application/json"
+    const resultados = [];
+    const slugsTestados = new Set();
+
+    for (const slug of slugsParaTestar) {
+      if (slugsTestados.has(slug)) continue;
+      slugsTestados.add(slug);
+
+      try {
+        const testUrl = `https://goyabu.io/anime/${slug}`;
+        const testResponse = await axios.get(testUrl, {
+          headers: { "User-Agent": "Mozilla/5.0" },
+          timeout: 3000,
+          validateStatus: () => true
+        });
+
+        if (testResponse.status === 200 && !testResponse.data.includes('404') && !testResponse.data.includes('não encontrada')) {
+          
+          const $ = cheerio.load(testResponse.data);
+          const generos = [];
+          
+          $('.filter-btn[href*="generos"]').each((i, el) => {
+            const genero = $(el).text().trim();
+            if (genero) generos.push(genero);
+          });
+          
+          const titulo = $('h1.text-hidden').first().text().trim() || slug;
+          const thumb = $('meta[property="og:image"]').attr('content') || null;
+          
+          // Tenta extrair ID
+          let id = null;
+          const scripts = $('script').map((i, el) => $(el).html()).get();
+          for (const script of scripts) {
+            if (script && script.includes('post_id')) {
+              const match = script.match(/post_id[=:]\s*(\d+)/);
+              if (match) {
+                id = match[1];
+                break;
+              }
+            }
+          }
+          
+          resultados.push({
+            id: id || slug.match(/\d+$/)?.[0] || null,
+            slug,
+            titulo,
+            thumb,
+            url: testUrl,
+            generos: generos.length ? generos : ["Não informado"]
+          });
+        }
+      } catch {
+        // Ignora erros
       }
-    });
 
-    const data = await response.json();
+      // Delay para não sobrecarregar
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
 
-    // Se não encontrou nada
-    if (!data || !data.length) {
+    // Remove duplicatas
+    const unicos = [];
+    const titulosVistos = new Set();
+    
+    for (const anime of resultados) {
+      const tituloLower = anime.titulo.toLowerCase();
+      if (!titulosVistos.has(tituloLower)) {
+        titulosVistos.add(tituloLower);
+        unicos.push(anime);
+      }
+    }
+
+    res.setHeader("Content-Type", "application/json");
+    
+    if (unicos.length === 0) {
       return res.status(200).json([]);
     }
 
-    console.log(`📊 Encontrados ${data.length} resultados. Buscando gêneros...`);
-
-    // 2️⃣ Para cada resultado, busca os gêneros
-    const resultadosComGeneros = [];
-    
-    for (let i = 0; i < data.length; i++) {
-      const item = data[i];
-      console.log(`   [${i+1}/${data.length}] ${item.title}...`);
-      
-      const generos = await getGenerosDoAnime(item.slug);
-      
-      resultadosComGeneros.push({
-        id: item.id,
-        slug: item.slug,
-        titulo: item.title,
-        thumb: item.thumb || null,
-        url: `https://goyabu.io/anime/${item.slug}`,
-        generos: generos.length ? generos : ["Não informado"]
-      });
-      
-      // Delay pequeno para não sobrecarregar
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
-
-    console.log(`\n✅ Retornando ${resultadosComGeneros.length} resultados com gêneros`);
-    
-    res.setHeader("Content-Type", "application/json");
-    return res.status(200).json(resultadosComGeneros);
+    return res.status(200).json(unicos);
 
   } catch (err) {
-    console.error("Erro:", err.message);
     return res.status(500).json({
       success: false,
       error: String(err?.message || err)
