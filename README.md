@@ -9,13 +9,13 @@
 </p>
 
 <p align="center">
-  <span style="color: #ef4444; font-weight: 600;">📦 BASE URL</span> <span style="color: #888;">•</span>
-  <span style="color: #ef4444; font-weight: 600;">⚡ ENDPOINTS</span> <span style="color: #888;">•</span>
-  <span style="color: #ef4444; font-weight: 600;">🔄 FLUXO</span> <span style="color: #888;">•</span>
-  <span style="color: #ef4444; font-weight: 600;">💻 EXEMPLOS</span> <span style="color: #888;">•</span>
-  <span style="color: #ef4444; font-weight: 600;">📬 RESPOSTAS</span> <span style="color: #888;">•</span>
-  <span style="color: #ef4444; font-weight: 600;">⚠️ ERROS</span> <span style="color: #888;">•</span>
-  <span style="color: #ef4444; font-weight: 600;">📋 CHANGELOG</span>
+  <span style="color: #ef4444; font-weight: 600;"> BASE URL</span> <span style="color: #888;">•</span>
+  <span style="color: #ef4444; font-weight: 600;"> ENDPOINTS</span> <span style="color: #888;">•</span>
+  <span style="color: #ef4444; font-weight: 600;"> FLUXO</span> <span style="color: #888;">•</span>
+  <span style="color: #ef4444; font-weight: 600;"> EXEMPLOS</span> <span style="color: #888;">•</span>
+  <span style="color: #ef4444; font-weight: 600;"> RESPOSTAS</span> <span style="color: #888;">•</span>
+  <span style="color: #ef4444; font-weight: 600;"> ERROS</span> <span style="color: #888;">•</span>
+  <span style="color: #ef4444; font-weight: 600;"> CHANGELOG</span>
 </p>
 
 ---
