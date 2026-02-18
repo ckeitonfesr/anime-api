@@ -2,7 +2,7 @@
   <img src="https://i.ibb.co/6RgzrZ7d/baixados.jpg" width="120" style="border-radius: 24px;" />
 </p>
 
-<h1 align="center">Anime API · Documentação</h1>
+<h1 align="center">Web Scraping - API de Animes</h1>
 
 <p align="center">
   <strong>Anime API · Busca, episódios, lançamentos, gêneros e vídeos</strong><br/>
